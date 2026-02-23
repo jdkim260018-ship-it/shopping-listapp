@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#667eea">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="쇼핑 리스트">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon.svg">
   <title>쇼핑 리스트</title>
   <style>
     :root {
@@ -225,7 +231,6 @@
     const emptyMsg   = document.getElementById('emptyMsg');
     const loadingMsg = document.getElementById('loadingMsg');
 
-    // 날짜 표시
     document.getElementById('date').textContent = new Date().toLocaleDateString('ko-KR', {
       year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
     });
