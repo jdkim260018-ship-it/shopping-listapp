@@ -182,6 +182,13 @@
       font-size: 0.92rem;
       padding: 32px 0;
     }
+
+    .loading {
+      text-align: center;
+      color: var(--color-text-muted);
+      font-size: 0.92rem;
+      padding: 32px 0;
+    }
   </style>
 </head>
 <body>
@@ -200,39 +207,44 @@
     </div>
 
     <ul id="list"></ul>
-    <p class="empty" id="emptyMsg">리스트가 비어 있습니다.</p>
+    <p class="loading" id="loadingMsg">불러오는 중...</p>
+    <p class="empty" id="emptyMsg" style="display:none">리스트가 비어 있습니다.</p>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
+    const SUPABASE_URL = 'https://hnlwtyqkzpafzewjxiiv.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhubHd0eXFrenBhZnpld2p4aWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4Mzk2MzYsImV4cCI6MjA4NzQxNTYzNn0.YpAFD0HZUMCychoDo-sj41nd_U-nPPqPX6olnT2kTto';
+
+    const { createClient } = supabase;
+    const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
     const input      = document.getElementById('itemInput');
     const list       = document.getElementById('list');
     const statsText  = document.getElementById('statsText');
     const emptyMsg   = document.getElementById('emptyMsg');
+    const loadingMsg = document.getElementById('loadingMsg');
 
     // 날짜 표시
     document.getElementById('date').textContent = new Date().toLocaleDateString('ko-KR', {
       year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
     });
 
-    // localStorage에서 불러오기
-    let items = JSON.parse(localStorage.getItem('shoppingList') ?? '[]');
-
-    function save() {
-      localStorage.setItem('shoppingList', JSON.stringify(items));
-    }
+    let items = [];
 
     function render() {
+      loadingMsg.style.display = 'none';
       emptyMsg.style.display = items.length === 0 ? 'block' : 'none';
 
       list.replaceChildren(
-        ...items.map((item, i) => {
+        ...items.map(item => {
           const li = document.createElement('li');
           if (item.done) li.classList.add('done');
 
           const cb = document.createElement('input');
           cb.type = 'checkbox';
           cb.checked = item.done;
-          cb.addEventListener('change', () => toggle(i));
+          cb.addEventListener('change', () => toggle(item.id, item.done));
 
           const span = document.createElement('span');
           span.className = 'item-text';
@@ -242,7 +254,7 @@
           del.className = 'delete-btn';
           del.textContent = '✕';
           del.title = '삭제';
-          del.addEventListener('click', () => remove(i));
+          del.addEventListener('click', () => remove(item.id));
 
           li.append(cb, span, del);
           return li;
@@ -256,31 +268,63 @@
         : `전체 ${total}개 · 완료 ${done}개`;
     }
 
-    function addItem() {
+    async function loadItems() {
+      const { data, error } = await db
+        .from('shopping_items')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (error) { console.error(error); return; }
+      items = data;
+      render();
+    }
+
+    async function addItem() {
       const text = input.value.trim();
       if (!text) { input.focus(); return; }
-      items.push({ text, done: false });
-      save();
+
+      const { data, error } = await db
+        .from('shopping_items')
+        .insert({ text, done: false })
+        .select()
+        .single();
+      if (error) { console.error(error); return; }
+
+      items.push(data);
       render();
       input.value = '';
       input.focus();
     }
 
-    function toggle(i) {
-      items[i].done = !items[i].done;
-      save();
+    async function toggle(id, currentDone) {
+      const { error } = await db
+        .from('shopping_items')
+        .update({ done: !currentDone })
+        .eq('id', id);
+      if (error) { console.error(error); return; }
+
+      items = items.map(item => item.id === id ? { ...item, done: !currentDone } : item);
       render();
     }
 
-    function remove(i) {
-      items = items.toSpliced(i, 1);
-      save();
+    async function remove(id) {
+      const { error } = await db
+        .from('shopping_items')
+        .delete()
+        .eq('id', id);
+      if (error) { console.error(error); return; }
+
+      items = items.filter(item => item.id !== id);
       render();
     }
 
-    function clearDone() {
-      items = items.filter(x => !x.done);
-      save();
+    async function clearDone() {
+      const { error } = await db
+        .from('shopping_items')
+        .delete()
+        .eq('done', true);
+      if (error) { console.error(error); return; }
+
+      items = items.filter(item => !item.done);
       render();
     }
 
@@ -290,7 +334,7 @@
       if (e.key === 'Enter') addItem();
     });
 
-    render();
+    loadItems();
   </script>
 </body>
 </html>
